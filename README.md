@@ -1,8 +1,21 @@
-## Welcome to GitHub Pages
+## Welcome to Kyle Got Gadgets
 
-You can use the [editor on GitHub](https://github.com/kylemtucker/kyle-got-gadgets/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+This is my personal repository used as a codebase for all my independently developed projects. If you have any questions or concerns, feel free to reach out to me via email at: kyletucker at berkeley dot edu
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+### 3D Lidar
+
+This is a project developed by myself that leverages a cheap 2d lidar with precise angular and rotational encoding to provide functionality similar to a 3d lidar device. Currently, this has been developed for ROS functionality using LOAM mapping techniques (Laser Odometry And Mapping) for map creation and localization. 
+More information about the LOAM ROS packages can be found in my repository labeled "Open Source LOAM"
+
+### GCC_Project
+
+This is a project branched off of the Gamecube Controller Project , which leverages an arduino nano board to manipulate Gamecube controller outputs to level the playing field in the videogame, Super Smash Bros Melee (Gamecube, 2001). I love this game with a burning passion and I would love to chat with you about what I have been developing, as well as get feedback for possible future gamecube controller plugins!
+
+### Vending Machine
+
+This is a project I have been developing independently, which uses an Arduino Uno board to control a basic visual interface, as well as vending operations for a home-made vending machine. This project can verify the validity of transactions using a custom cryptologically secure hash-function that is decoded on a host computer, which monitors mobile payment.
+
+<!-- Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
 
 ### Markdown
 
@@ -35,3 +48,4 @@ Your Pages site will use the layout and styles from the Jekyll theme you have se
 ### Support or Contact
 
 Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+ -->
