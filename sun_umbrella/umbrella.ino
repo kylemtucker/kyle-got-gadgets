@@ -36,8 +36,7 @@
 #define GPS_RX = 0 
 #define GPS_TX = 1
 
-// Motor control output pins
-// All of these pins are PWM enabled if necessary. YC, PC => Yaw Control, Pitch Control
+// Motor control output pins. YC, PC => Yaw Control, Pitch Control
 #define PC_PWM = 9
 #define PC_1 = 10
 #define PC_2 = 11
@@ -50,13 +49,9 @@
 #define PE_2 = 13
 
 void setup() {
-  // put your setup code here, to run once:
-  // Initialize buttons for start, manual activation for nodes
-  // Initialize control booleans, encoder data, etc
-
-  //
+  
   // CALLIBRATION CONSTANTS
-  //
+  
   // For your editing pleasure.
   int PITCH_PWM = 50; // PWM Size
   int PITCH_THRESH = 5; // 200 Encoder steps per revolution = +/- 2.5% error.
@@ -206,21 +201,6 @@ int readGPS(); {
   return 0;
 }
 
-
-// Return declanation angle in radians based on current day of year. (01/01 = 1, 12/31 = 365)
-float declination(int day) {
-  return 23.45 * (PI / 180) * sin(2 * PI * ((284 + day) / 36.25));
-}
-
-float hour_angle(int day) {
-  float longitude = ((int) tinyGPS.location.lng()) % 15;
-  float LT = 60 // in minutes???
-  float B = 360 * (day - 81) / 365
-  float ET = (9.87 * sin(2 * B)) - (7.54 * cos(B)) - (1.5 * cos(B))
-  float ST = LT + (ET / 60) + ((4 / 60) * (longitude));
-  return 15 * (12 - ST);
-}
-
 // Seed the pose of our umbrella. Read inputs from manual motor controls, as well as start button.
 // Loops until start button pressed, outputting motor control to specified motors as instructed.
 void seed() {
@@ -347,14 +327,18 @@ void step_yaw(int dir) {
   digitalWrite(YC_DIR, dir);
   digitalWrite(YC_PULSE, HIGH);
   delay(YAW_DELAY);
-  digitalWrite(YC_PULSE,LOW); 
+  digitalWrite(YC_PULSE, LOW); 
 }
 
 
 void kill_motors() {
-  pitchMotor.stop()
+  pitchMotor.stop();
+  digitalWrite(YC_PULSE, LOW);
+  digitalWrite(YC_PULSE, LOW);
 }
 
+
+// CONVERSION HELPERS
 // Convert pitch encoder number to radians
 float pitch_to_rad(int pitch) {
   return RAD_PER_PITCH * pitch;
@@ -389,4 +373,20 @@ bool close_enough_yaw() {
 
 bool close_enough_pitch() {
   return (abs(PITCH_ORIG - PITCH_CURR) < PITCH_THRESH);
+}
+
+// SOLAR CALCULATION HELPERS
+
+// Return declanation angle in radians based on current day of year. (01/01 = 1, 12/31 = 365)
+float declination(int day) {
+  return 23.45 * (PI / 180) * sin(2 * PI * ((284 + day) / 36.25));
+}
+
+float hour_angle(int day) {
+  float longitude = ((int) tinyGPS.location.lng()) % 15;
+  float LT = 60 // in minutes???
+  float B = 360 * (day - 81) / 365
+  float ET = (9.87 * sin(2 * B)) - (7.54 * cos(B)) - (1.5 * cos(B))
+  float ST = LT + (ET / 60) + ((4 / 60) * (longitude));
+  return 15 * (12 - ST);
 }
