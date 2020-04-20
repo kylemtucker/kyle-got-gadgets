@@ -15,6 +15,7 @@
 #define CALC 2   // Pose calculation
 #define MOVE 3   // Motor actuation
 #define SLEEP 4  // Sleep
+#define ERR 5
 
 //
 // PIN DEFINITIONS:
@@ -175,6 +176,9 @@ void loop() {
   else if (STATE == SLEEP) {
     sleep(SLEEP_INTERVAL);
   }
+  else if (STATE == ERR) {
+    error();
+  }
 }
 
 
@@ -221,13 +225,13 @@ float hour_angle(int day) {
 // Loops until start button pressed, outputting motor control to specified motors as instructed.
 void seed() {
 
-  if (digitalRead(START) == true) {
+  if (digitalRead(START) == HIGH) {
     STATE = 1;
     PITCH_ORIG = PITCH_CURR;
     YAW_ORIG = YAW_CURR;
   }
   
-  while (digitalRead(START) == true);
+  while (digitalRead(START) == HIGH);
   delay(20);
   
   while (digitalRead(PM_POS) == HIGH) {
@@ -324,6 +328,14 @@ void sleep(int duration) {
   
   // Optimization: Here, we could potentially conduct calculations for the future pose, given our current time and GPS coordinates.
   // Pre-emptively find future pose to lessen the computational load when attempting to find a new pose.
+}
+
+void error() {
+  if (digitalRead(START) == HIGH) {
+    STATE = SEED;
+  }
+  while (digitalRead(START) == HIGH);
+  delay(20);
 }
 
 //
