@@ -57,6 +57,8 @@ void setup() {
   int PITCH_PWM = 50; // PWM Size
   int PITCH_THRESH = 5; // 200 Encoder steps per revolution = +/- 2.5% error.
   int YAW_THRESH = 5; // 200 steps per revolution = +/- 2.5% error.
+  int PITCH_STEPS_PER_ROT = 500;
+  int YAW_STEPS_PER_ROT = 200;
 
   //
   // CONTROL CONSTATNTS
@@ -165,18 +167,22 @@ void loop() {
   }
   
   else if (STATE == GPS) {
+    kill_switch();
     gps();
   }
   
   else if (STATE == CALC) {
+    kill_switch();
     calc();
   }
   
   else if (STATE == MOVE) {
+    kill_switch();
     move_pose();
   }
   
   else if (STATE == SLEEP) {
+    kill_switch();
     sleep(SLEEP_INTERVAL);
   }
   
@@ -303,11 +309,11 @@ void calc() {
   if (spa_status == 0) {
 
     // Set target for pitch, yaw to point directly at sun
-    PITCH_TARGET_RAD = spa.azimuth;
-    YAW_TARGET_RAD = spa.zenith;
+    PITCH_TARGET_RAD = (PI / 2) - spa.azimuth; // Height from horizon
+    YAW_TARGET_RAD = spa.zenith; //  Rotation from 0 deg north
 
     // Set targets for motors in terms of encoder steps or stepper steps
-    set_targets();
+    set_targets(); 
 
     // Transition to move state
     STATE = MOVE;
@@ -420,12 +426,20 @@ void kill_motors() {
   digitalWrite(YC_PULSE, LOW);
 }
 
+void kill_switch() {
+  if (digitalRead(START) == HIGH) {
+    STATE = ERR;
+  }
+  while (digitalRead(START) == HIGH);
+  delay(20);
+}
+
 
 // CONVERSION HELPERS
 
 void set_targets() {
-  YAW_TARGET = norm_yaw(rad_to_yaw(YAW_TARGET_RAD));
-  PITCH_TARGET = norm_pitch(rad_to_pitch(PITCH_TARGET_RAD));
+  YAW_TARGET = norm_yaw(rad_to_yaw(YAW_TARGET_RAD)) % YAW_STEPS_PER_ROT;
+  PITCH_TARGET = norm_pitch(rad_to_pitch(PITCH_TARGET_RAD)) % PITCH_STEPS_PER_ROT;
 }
 
 // Convert pitch encoder number to radians
@@ -475,4 +489,3 @@ double get_timezone_est(float longitude) {
   }
   return num;
 }
-
