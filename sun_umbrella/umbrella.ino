@@ -3,6 +3,7 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include <L298N.h>
+#include <spa.h> // Solar Positioning Algorithm package
 
 // PHYSICAL UMBRELLA CONSTANTS:
 // The umbrella is to be seeded with an "origin" pose of:
@@ -33,20 +34,20 @@
 #define YM_NEG 6
 
 // GPS SERIAL PINS
-#define GPS_RX = 0 
-#define GPS_TX = 1
+#define GPS_RX 0 
+#define GPS_TX 1
 
 // Motor control output pins. YC, PC => Yaw Control, Pitch Control
-#define PC_PWM = 9
-#define PC_1 = 10
-#define PC_2 = 11
+#define PC_PWM 9
+#define PC_1 10
+#define PC_2 11
 
-#define YC_PULSE = 3
-#define YC_DIR = 4
+#define YC_PULSE 3
+#define YC_DIR 4
 
 // Motor encoder input pins. PE = Pitch Encoder
-#define PE_1 = 12
-#define PE_2 = 13
+#define PE_1 12
+#define PE_2 13
 
 void setup() {
   
@@ -137,6 +138,9 @@ void setup() {
   // Set the two serial ports to be the same, redefine SerialMonitor port.
   #define gpsPort ssGPS
   #define SerialMonitor Serial
+
+  // Solar Positioning Algorithm
+  spa_data spa;
   
 
   // OTHER HARDWARE
@@ -155,35 +159,44 @@ void setup() {
 // Main operational loop for FSM/umbrella control
 void loop() {
 
-  // Read all pins into 
+  // State machine control, choose which branch to traverse depending on STATE
   if (STATE == SEED) {
     seed();
   }
+  
   else if (STATE == GPS) {
     gps();
   }
+  
   else if (STATE == CALC) {
     calc();
   }
+  
   else if (STATE == MOVE) {
     move_pose();
   }
+  
   else if (STATE == SLEEP) {
     sleep(SLEEP_INTERVAL);
   }
+  
   else if (STATE == ERR) {
     error();
   }
+  
 }
 
 
 
 int readGPS(); {
-  // Read most current GPS information.
-  
+  // Read most current GPS information. 
+
+  // Start time for timeout detection
   long start = millis();
+  
   while (gpsPort.available()) {
     tinyGPS.encode(gpsPort.read()); 
+    
     if (millis() - start > GPS_TIMEOUT) {
       // Timed out
       if (FIRST_GPS) {
@@ -205,37 +218,43 @@ int readGPS(); {
 // Loops until start button pressed, outputting motor control to specified motors as instructed.
 void seed() {
 
+  // Read start button to begin!
   if (digitalRead(START) == HIGH) {
     STATE = 1;
     PITCH_ORIG = PITCH_CURR;
     YAW_ORIG = YAW_CURR;
   }
-  
+
+  // Wait until button released
   while (digitalRead(START) == HIGH);
   delay(20);
-  
+
+  // Move pitch in pos dir.
   while (digitalRead(PM_POS) == HIGH) {
     // Drive pitch motor in positive direction
     pitchMotor.forward();
     PITCH_CURR = pitchEnc.read();
-    delay(5);
+    delay(PITCH_DELAY);
   }
   pitchMotor.stop();
-  
+
+  // Move pitch in neg dir.
   while (digitalRead(PM_NEG) == HIGH) {
     // Drive pitch motor in negative direction
     pitchMotor.backward();
     PITCH_CURR = pitchEnc.read();
-    delay(5);
+    delay(PITCH_DELAY);
   }
   pitchMotor.stop(); 
-   
+
+  // Step yaw in pos dir
   while (digitalRead(YM_POS) == HIGH) {
     // Drive yaw motor in positive direction (CCW)
     step_yaw(1);
     YAW_CURR++:
   }
-  
+
+  // Step yaw in neg dir
   while (digitalRead(YM_NEG) == HIGH) {
     // Drive yaw motor in negative direction (CW)
     step_yaw(0);
@@ -245,52 +264,108 @@ void seed() {
 }
 
 void gps() {
+  
+  // Read GPS information via serial port
   int gps_status = readGPS();
 
+  // No GPS data, must transition to error state.
   if (gps_status == 2) {
-    STATE = SLEEP;
+    STATE = ERR;
   }
+
+  // Update data in SPA handler, move state to CALC stage.
   else {
     STATE = CALC;
+    
     LATITUDE = tinyGPS.location.lat();
     LONGITUDE = tinyGPS.location.lng();
-    TIME = tinyGPS.time.value();
-    DAY = tinyGPS.date.value();
+    DATE = tinyGPS.date.value();
+    
+    spa.year = tinyGPS.date.year();
+    spa.month = tinyGPS.date.month();
+    spa.day = tinyGPS.date.day();
+    spa.hour = tinyGPS.time.hour();
+    spa.minute = tinyGPS.time.minute();
+    spa.latitude = LATITUDE;
+    spa.longitude = LONGITUDE;
+    spa.elevation = tinyGPS.altitude.meters();
+    spa.timezone = get_timezone_est(LONGITUDE);
   }
 }
 
 void calc() {
-  // DO_CALCULATIONS
-  
-  // CHECK VALIDITY OF DETERMINED POSE (outside of tilt max/min?)
-  // SET UP DESIRED VALUES IN BOTH RAD AND ENCODER BASES
+  // Calculate locations for which we must align our yaw and tilt motors.
+
+  // Do solar calculations
+  int spa_status = spa_calculate(&spa);
+
+  // Check that we have valid data
+  if (spa_status == 0) {
+
+    // Set target for pitch, yaw to point directly at sun
+    PITCH_TARGET_RAD = spa.azimuth;
+    YAW_TARGET_RAD = spa.zenith;
+
+    // Set targets for motors in terms of encoder steps or stepper steps
+    set_targets();
+
+    // Transition to move state
+    STATE = MOVE;
+  }
+  else {
+    
+    // Transition to error state
+    STATE = ERR;
+  }
   
 }
 
-void move_pose_reset() {
-  reset_pitch();
-  move_pose
+void move_pose_with_reset() {
+
+  // Store old target
+  int yawTemp = YAW_TARGET;
+  int pitchTemp = PITCH_TARGET;
+
+  // Set curr target to origin
+  YAW_TARGET = YAW_ORIGIN;
+  PITCH_TARGET = PITCH_ORIGIN;
+
+  // Reset to origin
+  move_pose();
+
+  // Restore target pose
+  YAW_TARGET = yawTemp;
+  PITCH_TEMP = pitchTemp;
+
+  // Move to target
+  move_pose();
 }
 
 void move_pose() {
-  // Begin with yaw actuation
+  // Operates off YAW_TARGET and PITCH_TARGET, which must be set and normalized by origin values before 
+  
+  // Begin with yaw actuation. Determine positive or negative direction before rotating.
   
   if (YAW_TARGET - YAW_CURRENT > 0) {
     YAW_DIRECTION = 1;
   } else {
     YAW_DIRECTION = 0;
   }
+
+  // Determine positive or negative actuation for tilt.
   
   if (PITCH_TARGET - PITCH_CURRENT > 0) {
     PITCH_DIRECTION = 1;
   } else {
     PITCH_DIRECTION = 0;
   }
-  
+
+  // Step yaw in proper direction until "close enough"
   while (!close_enough_yaw()) {
     step_yaw(YAW_DIRECTION);
   }
 
+  // 'Step' pitch in proper direction until "close enough"
   while (!close_enough_pitch()) {
     if (PITCH_DIRECTION == 0) {
       pitchMotor.forward();
@@ -300,17 +375,23 @@ void move_pose() {
     delay(PITCH_DELAY);
     pitchMotor.stop();
   }
+  STATE = SLEEP;
 }
 
 void sleep(int duration) {
+
   
   delay(duration);
+
+  STATE = GPS;
   
   // Optimization: Here, we could potentially conduct calculations for the future pose, given our current time and GPS coordinates.
   // Pre-emptively find future pose to lessen the computational load when attempting to find a new pose.
 }
 
 void error() {
+  // Wait for reset signal.
+  kill_motors();
   if (digitalRead(START) == HIGH) {
     STATE = SEED;
   }
@@ -322,6 +403,7 @@ void error() {
 // HELPER FUNCTIONS
 //
 
+
 // Singular step of Yaw motor in DIRECTION
 void step_yaw(int dir) {
   digitalWrite(YC_DIR, dir);
@@ -331,6 +413,7 @@ void step_yaw(int dir) {
 }
 
 
+// Stop all actuation.
 void kill_motors() {
   pitchMotor.stop();
   digitalWrite(YC_PULSE, LOW);
@@ -339,6 +422,12 @@ void kill_motors() {
 
 
 // CONVERSION HELPERS
+
+void set_targets() {
+  YAW_TARGET = norm_yaw(rad_to_yaw(YAW_TARGET_RAD));
+  PITCH_TARGET = norm_pitch(rad_to_pitch(PITCH_TARGET_RAD));
+}
+
 // Convert pitch encoder number to radians
 float pitch_to_rad(int pitch) {
   return RAD_PER_PITCH * pitch;
@@ -360,33 +449,30 @@ int rad_to_yaw(float rad) {
 }
 
 int norm_pitch(int pitch) {
-  return pitch - PITCH_ORIG;
+  return pitch + PITCH_ORIG;
 }
 
 int norm_yaw(int yaw) {
-  return yaw - YAW_ORIG;
+  return yaw + YAW_ORIG;
 }
 
+// Close enough comparison for yaw
 bool close_enough_yaw() {
   return (abs(YAW_ORIG - YAW_CURR) < YAW_THRESH);
 }
 
+// Close enough comparison for pitch
 bool close_enough_pitch() {
   return (abs(PITCH_ORIG - PITCH_CURR) < PITCH_THRESH);
 }
 
 // SOLAR CALCULATION HELPERS
 
-// Return declanation angle in radians based on current day of year. (01/01 = 1, 12/31 = 365)
-float declination(int day) {
-  return 23.45 * (PI / 180) * sin(2 * PI * ((284 + day) / 36.25));
+double get_timezone_est(float longitude) {
+  double num = ((int) longitude) % 15;
+  if (num > 18) {
+    return 24 - num;
+  }
+  return num;
 }
 
-float hour_angle(int day) {
-  float longitude = ((int) tinyGPS.location.lng()) % 15;
-  float LT = 60 // in minutes???
-  float B = 360 * (day - 81) / 365
-  float ET = (9.87 * sin(2 * B)) - (7.54 * cos(B)) - (1.5 * cos(B))
-  float ST = LT + (ET / 60) + ((4 / 60) * (longitude));
-  return 15 * (12 - ST);
-}
