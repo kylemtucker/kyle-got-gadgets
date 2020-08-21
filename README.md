@@ -15,6 +15,10 @@ This is a project branched off of the Gamecube Controller Project , which levera
 
 This is a project I have been developing independently, which uses an Arduino Uno board to control a basic visual interface, as well as vending operations for a home-made vending machine. This project can verify the validity of transactions using a custom cryptologically secure hash-function that is decoded on a host computer, which monitors mobile payment.
 
+### Cart Turn Signals
+
+Shopping at Whole Foods as an Amazon Prime Now shopper has its own set of challenges. One such challenge revolves around maintaining a proper social distance while navigating store aisles. This cart turn signal gadget is mountable on any cart, and provides a means of communicating your intention of travel with other customers!
+
 <!-- Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
 
 ### Markdown
